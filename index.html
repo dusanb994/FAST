@@ -455,12 +455,12 @@ header{
 </div>
 
 <script>
-const STORAGE_KEY = 'mealTracker';
 const DAY_NAMES = ['NED','PON','UTO','SRE','ČET','PET','SUB'];
 const MONTH_NAMES = ['jan','feb','mar','apr','maj','jun','jul','avg','sep','okt','nov','dec'];
 const HOURS_SHOWN = [0,3,6,9,12,15,18,21];
 
 let currentWeekStart = getMonday(new Date());
+let meals = {};
 
 function getMonday(d) {
   const date = new Date(d);
@@ -478,32 +478,21 @@ function dateKey(d) {
   return `${y}-${m}-${day}`;
 }
 
-function loadMeals() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
-  catch { return {}; }
-}
-
-function saveMeals(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
 function addMeal(dateStr, time, note) {
-  const data = loadMeals();
-  if (!data[dateStr]) data[dateStr] = [];
-  data[dateStr].push({ time, note: note || '' });
-  data[dateStr].sort((a,b) => a.time.localeCompare(b.time));
-  saveMeals(data);
-  syncAfterChange();
+  if (!meals[dateStr]) meals[dateStr] = [];
+  meals[dateStr].push({ time, note: note || '' });
+  meals[dateStr].sort((a,b) => a.time.localeCompare(b.time));
+  renderWeek();
+  pushToGist();
 }
 
 function removeMeal(dateStr, time) {
-  const data = loadMeals();
-  if (!data[dateStr]) return;
-  const idx = data[dateStr].findIndex(m => m.time === time);
-  if (idx !== -1) data[dateStr].splice(idx, 1);
-  if (data[dateStr].length === 0) delete data[dateStr];
-  saveMeals(data);
-  syncAfterChange();
+  if (!meals[dateStr]) return;
+  const idx = meals[dateStr].findIndex(m => m.time === time);
+  if (idx !== -1) meals[dateStr].splice(idx, 1);
+  if (meals[dateStr].length === 0) delete meals[dateStr];
+  renderWeek();
+  pushToGist();
 }
 
 function timeToMinutes(t) {
@@ -532,7 +521,7 @@ function isToday(d) {
 function renderWeek() {
   const container = document.getElementById('weekContainer');
   container.innerHTML = '';
-  const data = loadMeals();
+  const data = meals;
   const now = new Date();
 
   for (let i = 0; i < 7; i++) {
@@ -729,7 +718,6 @@ document.getElementById('modalSave').addEventListener('click', () => {
   if (!d || !t) return;
   addMeal(d, t, noteInput.value.trim());
   closeModal();
-  renderWeek();
 });
 
 document.addEventListener('keydown', (e) => {
@@ -747,7 +735,6 @@ document.addEventListener('click', (e) => {
   const date = btn.dataset.date;
   const time = btn.dataset.time;
   removeMeal(date, time);
-  renderWeek();
 });
 
 // Mobile swipe indicator: highlight current day column
@@ -774,7 +761,7 @@ setInterval(() => {
   nowLines.forEach(l => { l.style.top = minutesToPercent(nowMin) + '%'; });
 }, 60000);
 
-// ── Gist Sync ─────────────────────────────────
+// ── Gist API ──────────────────────────────────
 const GIST_TOKEN_KEY = 'mealTracker_ghToken';
 const GIST_ID_KEY = 'mealTracker_gistId';
 const GIST_FILE = 'meal-tracker-data.json';
@@ -791,106 +778,56 @@ function isGistConnected() {
   return !!(c.token && c.gistId);
 }
 
-async function createGist(token) {
+async function gistCreate(token) {
   const res = await fetch('https://api.github.com/gists', {
     method: 'POST',
     headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       description: 'Meal Tracker data',
       public: false,
-      files: { [GIST_FILE]: { content: JSON.stringify(loadMeals()) } }
+      files: { [GIST_FILE]: { content: '{}' } }
     })
   });
   if (!res.ok) throw new Error(`GitHub API: ${res.status}`);
-  const data = await res.json();
-  return data.id;
+  return (await res.json()).id;
 }
 
-async function updateGist(token, gistId, meals) {
-  const res = await fetch(`https://api.github.com/gists/${gistId}`, {
-    method: 'PATCH',
-    headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      files: { [GIST_FILE]: { content: JSON.stringify(meals) } }
-    })
-  });
-  if (!res.ok) throw new Error(`GitHub API: ${res.status}`);
-}
-
-async function loadGist(token, gistId) {
-  const res = await fetch(`https://api.github.com/gists/${gistId}`, {
-    headers: { 'Authorization': `token ${token}` }
-  });
-  if (!res.ok) throw new Error(`GitHub API: ${res.status}`);
-  const data = await res.json();
-  const file = data.files[GIST_FILE];
-  if (!file) return {};
-  try { return JSON.parse(file.content); } catch { return {}; }
-}
-
-function mergeData(local, remote) {
-  const merged = {};
-  const allDates = new Set([...Object.keys(local), ...Object.keys(remote)]);
-  for (const date of allDates) {
-    const lMeals = local[date] || [];
-    const rMeals = remote[date] || [];
-    const seen = new Set();
-    const combined = [];
-    for (const m of [...lMeals, ...rMeals]) {
-      const key = m.time + '|' + (m.note || '');
-      if (!seen.has(key)) { seen.add(key); combined.push(m); }
-    }
-    combined.sort((a, b) => a.time.localeCompare(b.time));
-    if (combined.length > 0) merged[date] = combined;
-  }
-  return merged;
-}
-
-let syncInProgress = false;
-
-async function syncPull(showUI = false) {
-  if (syncInProgress) return;
+async function pushToGist() {
   if (!isGistConnected()) return;
-  syncInProgress = true;
   updateSyncDot('syncing');
   try {
     const { token, gistId } = getGistConfig();
-    const remote = await loadGist(token, gistId);
-    const local = loadMeals();
-    const merged = mergeData(local, remote);
-    saveMeals(merged);
-    await updateGist(token, gistId, merged);
-    renderWeek();
-    updateSyncDot('connected');
-    if (showUI) showSyncMsg('Sinhronizovano!', 'ok');
-  } catch (err) {
-    updateSyncDot('connected');
-    if (showUI) showSyncMsg('Greska: ' + err.message, 'err');
-  } finally {
-    syncInProgress = false;
-  }
-}
-
-async function syncPush() {
-  if (syncInProgress) return;
-  if (!isGistConnected()) return;
-  syncInProgress = true;
-  updateSyncDot('syncing');
-  try {
-    const { token, gistId } = getGistConfig();
-    await updateGist(token, gistId, loadMeals());
+    await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(meals) } } })
+    });
     updateSyncDot('connected');
   } catch {
     updateSyncDot('connected');
-  } finally {
-    syncInProgress = false;
   }
 }
 
-function syncAfterChange() {
+async function pullFromGist() {
   if (!isGistConnected()) return;
-  clearTimeout(syncAfterChange._t);
-  syncAfterChange._t = setTimeout(() => syncPush(), 1000);
+  updateSyncDot('syncing');
+  try {
+    const { token, gistId } = getGistConfig();
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    if (!res.ok) throw new Error(`GitHub API: ${res.status}`);
+    const data = await res.json();
+    const file = data.files[GIST_FILE];
+    if (file) {
+      try { meals = JSON.parse(file.content) || {}; } catch { meals = {}; }
+    }
+    renderWeek();
+    updateSyncDot('connected');
+  } catch (err) {
+    updateSyncDot('connected');
+    throw err;
+  }
 }
 
 function updateSyncDot(state) {
@@ -956,30 +893,42 @@ document.getElementById('btnConnect').addEventListener('click', async () => {
       if (!res.ok) throw new Error('Gist nije pronadjen');
       gistId = existingId;
     } else {
-      gistId = await createGist(token);
+      gistId = await gistCreate(token);
     }
     localStorage.setItem(GIST_TOKEN_KEY, token);
     localStorage.setItem(GIST_ID_KEY, gistId);
     updateSettingsUI();
-    await syncPull(true);
+    await pullFromGist();
+    showSyncMsg('Povezano!', 'ok');
   } catch (err) {
     showSyncMsg('Greska: ' + err.message, 'err');
   }
 });
 
-document.getElementById('btnSyncNow').addEventListener('click', () => syncPull(true));
+document.getElementById('btnSyncNow').addEventListener('click', async () => {
+  try { await pullFromGist(); showSyncMsg('Sinhronizovano!', 'ok'); }
+  catch (err) { showSyncMsg('Greska: ' + err.message, 'err'); }
+});
 
 document.getElementById('btnDisconnect').addEventListener('click', () => {
   localStorage.removeItem(GIST_TOKEN_KEY);
   localStorage.removeItem(GIST_ID_KEY);
+  meals = {};
+  renderWeek();
   updateSettingsUI();
   showSyncMsg('Veza prekinuta', '');
 });
 
 // Init
-renderWeek();
-updateSyncDot(isGistConnected() ? 'connected' : 'disconnected');
-if (isGistConnected()) syncPull();
+(async () => {
+  if (isGistConnected()) {
+    updateSyncDot('syncing');
+    try { await pullFromGist(); } catch { updateSyncDot('connected'); }
+  } else {
+    renderWeek();
+    updateSyncDot('disconnected');
+  }
+})();
 
 // PWA Service Worker
 if ('serviceWorker' in navigator) {
