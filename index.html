@@ -206,6 +206,14 @@ header{
 .overnight-fast-arrow{
   font-size:.5rem;color:#818cf8;opacity:.5;line-height:1;
 }
+.current-fast{
+  position:absolute;left:0;right:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  pointer-events:none;z-index:5;
+  gap:1px;
+  background:rgba(129,140,248,.06);
+  border-left:2px solid rgba(129,140,248,.25);
+}
 
 /* ── Stats Row ──────────────────────────────── */
 .day-stats{
@@ -379,7 +387,7 @@ header{
 <header>
   <div class="logo">
     <span class="logo-icon">&#127860;</span>
-    <span>Meal Tracker <small style="font-size:.6em;color:var(--text2)">(v9)</small></span>
+    <span>Meal Tracker <small style="font-size:.6em;color:var(--text2)">(v11)</small></span>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <button class="today-btn" id="todayBtn">Danas</button>
@@ -637,6 +645,36 @@ function renderWeek() {
       nowLine.style.top = minutesToPercent(nowMin) + '%';
       nowLine.innerHTML = '<div class="now-dot"></div>';
       timeline.appendChild(nowLine);
+
+      let lastMealMin = null;
+      let fromPrev = false;
+      const before = meals.filter(m => timeToMinutes(m.time) <= nowMin);
+      if (before.length > 0) {
+        lastMealMin = timeToMinutes(before[before.length - 1].time);
+      } else {
+        const prevDay = new Date(day);
+        prevDay.setDate(prevDay.getDate() - 1);
+        const prevMeals = data[dateKey(prevDay)];
+        if (prevMeals && prevMeals.length > 0) {
+          lastMealMin = timeToMinutes(prevMeals[prevMeals.length - 1].time);
+          fromPrev = true;
+        }
+      }
+      if (lastMealMin !== null) {
+        const fastMin = fromPrev ? (1440 - lastMealMin) + nowMin : nowMin - lastMealMin;
+        const badgeTop = fromPrev ? 0 : lastMealMin;
+        const badgeH = fromPrev ? nowMin : fastMin;
+        const badge = document.createElement('div');
+        badge.className = 'current-fast';
+        badge.style.top = minutesToPercent(badgeTop) + '%';
+        badge.style.height = minutesToPercent(badgeH) + '%';
+        badge.innerHTML = `
+          <span class="overnight-fast-label">post</span>
+          <span class="overnight-fast-value">${formatDuration(fastMin)}</span>
+          <span class="overnight-fast-arrow">&#9660;</span>
+        `;
+        timeline.appendChild(badge);
+      }
     }
 
     timeline.addEventListener('click', (e) => {
