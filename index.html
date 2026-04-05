@@ -347,17 +347,16 @@ header{
   .logo{font-size:1.05rem}
   .week-nav{order:3;width:100%;justify-content:center}
   .week-container{
-    gap:0;padding:0 0 80px;
-    scroll-snap-type:x mandatory;
-    scroll-padding:0;
+    gap:4px;padding:0 4px 80px;
+    overflow:hidden;
     flex-wrap:nowrap;
   }
   .day-column{
-    min-width:calc(100vw - 32px);
-    max-width:calc(100vw - 32px);
+    min-width:calc((100vw - 16px) / 3);
+    max-width:calc((100vw - 16px) / 3);
     flex:0 0 auto;
-    padding:0 16px;
-    scroll-snap-align:start;
+    padding:0;
+    transition:transform .3s ease, opacity .3s ease;
   }
   .timeline{min-height:55vh}
   .fab{bottom:16px;right:16px;width:50px;height:50px;font-size:1.5rem}
@@ -661,12 +660,7 @@ function updateWeekLabel() {
 }
 
 function scrollToToday() {
-  if (window.innerWidth > 640) return;
-  const container = document.getElementById('weekContainer');
-  const todayCol = container.querySelector('.is-today');
-  if (todayCol) {
-    todayCol.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
-  }
+  if (isMobile()) { initMobileToday(); return; }
 }
 
 // Navigation
@@ -737,21 +731,70 @@ document.addEventListener('click', (e) => {
   removeMeal(date, time);
 });
 
-// Mobile swipe indicator: highlight current day column
-function updateMobileIndicator() {
-  if (window.innerWidth > 640) return;
+// Mobile: show 3 days, swipe 1 day at a time
+let mobileOffset = 0;
+
+function isMobile() { return window.innerWidth <= 640; }
+
+function getMobileColWidth() {
+  const container = document.getElementById('weekContainer');
+  const col = container.querySelector('.day-column');
+  if (!col) return 0;
+  return col.offsetWidth + 4;
+}
+
+function setMobileOffset(idx) {
+  mobileOffset = Math.max(0, Math.min(idx, 4));
+  applyMobileTransform();
+}
+
+function applyMobileTransform() {
+  if (!isMobile()) return;
   const container = document.getElementById('weekContainer');
   const cols = container.querySelectorAll('.day-column');
-  const scrollLeft = container.scrollLeft;
-  const colWidth = cols[0]?.offsetWidth || 1;
-  const activeIdx = Math.round(scrollLeft / colWidth);
+  const shift = mobileOffset * getMobileColWidth();
   cols.forEach((c, i) => {
-    c.style.opacity = i === activeIdx ? '1' : '.4';
+    c.style.transform = `translateX(-${shift}px)`;
+    const visible = i >= mobileOffset && i < mobileOffset + 3;
+    c.style.opacity = visible ? '1' : '.3';
   });
 }
 
-document.getElementById('weekContainer').addEventListener('scroll', updateMobileIndicator);
-window.addEventListener('resize', () => { renderWeek(); });
+function initMobileToday() {
+  if (!isMobile()) return;
+  const container = document.getElementById('weekContainer');
+  const todayCol = container.querySelector('.is-today');
+  if (todayCol) {
+    const cols = [...container.querySelectorAll('.day-column')];
+    const idx = cols.indexOf(todayCol);
+    setMobileOffset(Math.max(0, Math.min(idx - 1, 4)));
+  } else {
+    setMobileOffset(0);
+  }
+}
+
+(function setupSwipe() {
+  const container = document.getElementById('weekContainer');
+  let startX = 0, startY = 0, swiping = false;
+
+  container.addEventListener('touchstart', (e) => {
+    if (!isMobile()) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    swiping = true;
+  }, { passive: true });
+
+  container.addEventListener('touchend', (e) => {
+    if (!isMobile() || !swiping) return;
+    swiping = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
+    if (dx < 0) setMobileOffset(mobileOffset + 1);
+    else setMobileOffset(mobileOffset - 1);
+  }, { passive: true });
+})();
+window.addEventListener('resize', () => { renderWeek(); applyMobileTransform(); });
 
 // Update now-line every minute
 setInterval(() => {
