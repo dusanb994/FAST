@@ -848,7 +848,7 @@ function mergeData(local, remote) {
 
 let syncInProgress = false;
 
-async function syncWithGist(showUI = false) {
+async function syncPull(showUI = false) {
   if (syncInProgress) return;
   if (!isGistConnected()) return;
   syncInProgress = true;
@@ -871,10 +871,26 @@ async function syncWithGist(showUI = false) {
   }
 }
 
+async function syncPush() {
+  if (syncInProgress) return;
+  if (!isGistConnected()) return;
+  syncInProgress = true;
+  updateSyncDot('syncing');
+  try {
+    const { token, gistId } = getGistConfig();
+    await updateGist(token, gistId, loadMeals());
+    updateSyncDot('connected');
+  } catch {
+    updateSyncDot('connected');
+  } finally {
+    syncInProgress = false;
+  }
+}
+
 function syncAfterChange() {
   if (!isGistConnected()) return;
   clearTimeout(syncAfterChange._t);
-  syncAfterChange._t = setTimeout(() => syncWithGist(), 1500);
+  syncAfterChange._t = setTimeout(() => syncPush(), 1000);
 }
 
 function updateSyncDot(state) {
@@ -945,13 +961,13 @@ document.getElementById('btnConnect').addEventListener('click', async () => {
     localStorage.setItem(GIST_TOKEN_KEY, token);
     localStorage.setItem(GIST_ID_KEY, gistId);
     updateSettingsUI();
-    await syncWithGist(true);
+    await syncPull(true);
   } catch (err) {
     showSyncMsg('Greska: ' + err.message, 'err');
   }
 });
 
-document.getElementById('btnSyncNow').addEventListener('click', () => syncWithGist(true));
+document.getElementById('btnSyncNow').addEventListener('click', () => syncPull(true));
 
 document.getElementById('btnDisconnect').addEventListener('click', () => {
   localStorage.removeItem(GIST_TOKEN_KEY);
@@ -963,7 +979,7 @@ document.getElementById('btnDisconnect').addEventListener('click', () => {
 // Init
 renderWeek();
 updateSyncDot(isGistConnected() ? 'connected' : 'disconnected');
-if (isGistConnected()) syncWithGist();
+if (isGistConnected()) syncPull();
 
 // PWA Service Worker
 if ('serviceWorker' in navigator) {
