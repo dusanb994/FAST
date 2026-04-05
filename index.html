@@ -342,7 +342,7 @@ header{
 .confirm-tooltip .btn{padding:4px 10px;font-size:.7rem}
 
 /* ── Responsive ─────────────────────────────── */
-@media(max-width:640px){
+@media(max-width:499px){
   header{padding:14px 16px 8px;flex-wrap:wrap;gap:8px}
   .logo{font-size:1.05rem}
   .week-nav{order:3;width:100%;justify-content:center}
@@ -363,7 +363,7 @@ header{
   .meal-note-label{opacity:1}
   .meal-delete{opacity:.7}
 }
-@media(min-width:641px) and (max-width:900px){
+@media(min-width:500px) and (max-width:900px){
   .day-column{min-width:90px}
 }
 
@@ -734,7 +734,7 @@ document.addEventListener('click', (e) => {
 // Mobile: show 3 days, swipe 1 day at a time
 let mobileOffset = 0;
 
-function isMobile() { return window.innerWidth <= 640; }
+function isMobile() { return window.innerWidth < 500; }
 
 function getMobileColWidth() {
   const container = document.getElementById('weekContainer');
