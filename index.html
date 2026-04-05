@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#111117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meals">
+<title>Meal Tracker</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#111117;
+  --surface:#1a1a24;
+  --surface2:#22222f;
+  --border:#2a2a3a;
+  --text:#e8e8f0;
+  --text2:#8888a0;
+  --accent:#f59e0b;
+  --accent-glow:rgba(245,158,11,.15);
+  --eating:rgba(245,158,11,.18);
+  --eating-border:rgba(245,158,11,.35);
+  --fasting:#1a1a24;
+  --marker:#f59e0b;
+  --marker-glow:rgba(245,158,11,.5);
+  --danger:#ef4444;
+  --radius:12px;
+  --font:'DM Sans',system-ui,sans-serif;
+}
+html{font-size:16px}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  overflow-x:hidden;
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+
+/* ── Header ────────────────────────────────── */
+header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:20px 24px 12px;
+  position:sticky;top:0;z-index:10;
+  background:var(--bg);
+}
+.logo{display:flex;align-items:center;gap:10px;font-size:1.25rem;font-weight:600;letter-spacing:-.02em}
+.logo-icon{font-size:1.5rem}
+.week-nav{display:flex;align-items:center;gap:8px}
+.week-nav button{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  width:36px;height:36px;border-radius:8px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;transition:all .15s;
+}
+.week-nav button:hover{background:var(--surface2);border-color:var(--accent)}
+.week-label{
+  font-size:.9rem;font-weight:500;color:var(--text2);
+  min-width:160px;text-align:center;
+}
+.today-btn{
+  background:var(--accent);color:#000;border:none;
+  padding:6px 14px;border-radius:8px;font-size:.8rem;font-weight:600;
+  cursor:pointer;font-family:var(--font);transition:all .15s;
+}
+.today-btn:hover{opacity:.85}
+
+/* ── Week Grid ─────────────────────────────── */
+.week-container{
+  flex:1;display:flex;gap:6px;
+  padding:0 16px 80px;
+  overflow-x:auto;
+  scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling:touch;
+}
+.day-column{
+  flex:1;min-width:0;
+  display:flex;flex-direction:column;
+  scroll-snap-align:center;
+}
+.day-header{
+  text-align:center;padding:8px 0 6px;
+  position:sticky;top:0;z-index:2;
+  background:var(--bg);
+}
+.day-name{font-size:.7rem;font-weight:600;text-transform:uppercase;color:var(--text2);letter-spacing:.06em}
+.day-date{font-size:.85rem;font-weight:500;margin-top:2px}
+.day-column.is-today .day-date{
+  color:var(--accent);font-weight:700;
+}
+.day-column.is-today .day-name{color:var(--accent)}
+
+.timeline{
+  position:relative;
+  flex:1;
+  background:var(--surface);
+  border-radius:var(--radius);
+  border:1px solid var(--border);
+  min-height:420px;
+  overflow:hidden;
+  cursor:pointer;
+  transition:border-color .2s;
+}
+.timeline:hover{border-color:var(--accent);border-color:rgba(245,158,11,.4)}
+
+/* hour ticks */
+.hour-tick{
+  position:absolute;left:0;right:0;
+  border-top:1px solid rgba(255,255,255,.04);
+  pointer-events:none;
+}
+.hour-label{
+  position:absolute;left:4px;
+  font-size:.55rem;color:var(--text2);opacity:.5;
+  transform:translateY(-50%);pointer-events:none;
+  line-height:1;
+}
+
+/* eating window zone */
+.eating-zone{
+  position:absolute;left:0;right:0;
+  background:var(--eating);
+  border-left:3px solid var(--eating-border);
+  transition:all .3s ease;
+  pointer-events:none;
+}
+
+/* meal markers */
+.meal-marker{
+  position:absolute;left:0;right:0;
+  height:22px;
+  display:flex;align-items:center;
+  padding:0 4px;
+  transform:translateY(-50%);
+  z-index:3;cursor:pointer;
+  transition:all .15s;
+}
+.meal-marker:hover{transform:translateY(-50%) scale(1.05)}
+.meal-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--marker);
+  box-shadow:0 0 8px var(--marker-glow);
+  flex-shrink:0;
+}
+.meal-time-label{
+  font-size:.6rem;font-weight:600;color:var(--accent);
+  margin-left:4px;white-space:nowrap;
+}
+.meal-note-label{
+  font-size:.55rem;color:var(--text2);
+  margin-left:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  opacity:0;transition:opacity .15s;max-width:50px;
+}
+.meal-marker:hover .meal-note-label{opacity:1}
+
+/* delete btn on marker */
+.meal-delete{
+  position:absolute;right:2px;top:50%;transform:translateY(-50%);
+  width:16px;height:16px;border-radius:50%;
+  background:var(--danger);color:#fff;border:none;
+  font-size:.6rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .15s;
+  font-family:var(--font);line-height:1;
+}
+.meal-marker:hover .meal-delete{opacity:1}
+
+/* now indicator */
+.now-line{
+  position:absolute;left:0;right:0;height:2px;
+  background:var(--accent);z-index:4;pointer-events:none;
+  box-shadow:0 0 6px var(--marker-glow);
+}
+.now-dot{
+  position:absolute;left:-3px;top:-3px;
+  width:8px;height:8px;border-radius:50%;
+  background:var(--accent);
+}
+
+/* overnight fast badge */
+.overnight-fast{
+  position:absolute;left:0;right:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  pointer-events:none;z-index:2;
+  gap:1px;
+}
+.overnight-fast-label{
+  font-size:.55rem;font-weight:600;color:var(--text2);
+  letter-spacing:.02em;text-transform:uppercase;
+  opacity:.7;
+}
+.overnight-fast-value{
+  font-size:.7rem;font-weight:700;color:#818cf8;
+  text-shadow:0 0 8px rgba(129,140,248,.3);
+}
+.overnight-fast-arrow{
+  font-size:.5rem;color:#818cf8;opacity:.5;line-height:1;
+}
+
+/* ── Stats Row ──────────────────────────────── */
+.day-stats{
+  text-align:center;padding:8px 0 4px;
+}
+.stat-eating{font-size:.7rem;font-weight:600;color:var(--accent)}
+.stat-fasting{font-size:.6rem;color:var(--text2);margin-top:1px}
+.stat-count{font-size:.55rem;color:var(--text2);margin-top:1px}
+
+/* ── FAB ────────────────────────────────────── */
+.fab{
+  position:fixed;bottom:24px;right:24px;z-index:20;
+  width:56px;height:56px;border-radius:50%;
+  background:var(--accent);color:#000;
+  border:none;font-size:1.8rem;font-weight:300;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px rgba(245,158,11,.4);
+  transition:all .2s;
+  font-family:var(--font);
+}
+.fab:hover{transform:scale(1.1);box-shadow:0 6px 30px rgba(245,158,11,.5)}
+.fab:active{transform:scale(.95)}
+
+/* ── Modal ──────────────────────────────────── */
+.modal-overlay{
+  position:fixed;inset:0;z-index:50;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.modal-overlay.active{opacity:1;pointer-events:auto}
+.modal{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:16px;padding:28px 24px 24px;
+  width:min(380px,92vw);
+  transform:translateY(20px);transition:transform .25s;
+}
+.modal-overlay.active .modal{transform:translateY(0)}
+.modal h2{font-size:1.1rem;font-weight:600;margin-bottom:20px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:.75rem;font-weight:500;color:var(--text2);margin-bottom:6px}
+.form-group input,.form-group select{
+  width:100%;padding:10px 12px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);
+  font-family:var(--font);font-size:.9rem;
+  outline:none;transition:border-color .15s;
+}
+.form-group input:focus{border-color:var(--accent)}
+.form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+.btn{
+  padding:10px 20px;border-radius:8px;font-size:.85rem;font-weight:600;
+  cursor:pointer;border:none;font-family:var(--font);transition:all .15s;
+}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{opacity:.85}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--accent)}
+
+/* ── Confirm delete tooltip ─────────────────── */
+.confirm-tooltip{
+  position:absolute;right:0;top:100%;margin-top:4px;
+  background:var(--surface);border:1px solid var(--danger);
+  border-radius:8px;padding:8px 10px;z-index:30;
+  display:flex;align-items:center;gap:8px;
+  white-space:nowrap;font-size:.75rem;
+  box-shadow:0 4px 16px rgba(0,0,0,.5);
+}
+.confirm-tooltip .btn{padding:4px 10px;font-size:.7rem}
+
+/* ── Responsive ─────────────────────────────── */
+@media(max-width:640px){
+  header{padding:14px 16px 8px;flex-wrap:wrap;gap:8px}
+  .logo{font-size:1.05rem}
+  .week-nav{order:3;width:100%;justify-content:center}
+  .week-container{
+    gap:0;padding:0 0 80px;
+    scroll-snap-type:x mandatory;
+    scroll-padding:0;
+    flex-wrap:nowrap;
+  }
+  .day-column{
+    min-width:calc(100vw - 32px);
+    max-width:calc(100vw - 32px);
+    flex:0 0 auto;
+    padding:0 16px;
+    scroll-snap-align:start;
+  }
+  .timeline{min-height:55vh}
+  .fab{bottom:16px;right:16px;width:50px;height:50px;font-size:1.5rem}
+  .meal-note-label{opacity:1}
+  .meal-delete{opacity:.7}
+}
+@media(min-width:641px) and (max-width:900px){
+  .day-column{min-width:90px}
+}
+
+/* ── Animations ─────────────────────────────── */
+@keyframes fadeInUp{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.meal-marker{animation:fadeInUp .3s ease}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-icon">&#127860;</span>
+    <span>Meal Tracker</span>
+  </div>
+  <button class="today-btn" id="todayBtn">Danas</button>
+  <nav class="week-nav">
+    <button id="prevWeek" aria-label="Previous week">&#8249;</button>
+    <span class="week-label" id="weekLabel"></span>
+    <button id="nextWeek" aria-label="Next week">&#8250;</button>
+  </nav>
+</header>
+
+<div class="week-container" id="weekContainer"></div>
+
+<button class="fab" id="fabAdd" aria-label="Dodaj obrok">+</button>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Novi obrok</h2>
+    <div class="form-group">
+      <label for="mealDate">Datum</label>
+      <input type="date" id="mealDate">
+    </div>
+    <div class="form-group">
+      <label for="mealTime">Vreme</label>
+      <input type="time" id="mealTime">
+    </div>
+    <div class="form-group">
+      <label for="mealNote">Beleška (opciono)</label>
+      <input type="text" id="mealNote" placeholder="npr. doručak, ručak..." maxlength="30">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" id="modalCancel">Otkaži</button>
+      <button class="btn btn-primary" id="modalSave">Sačuvaj</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'mealTracker';
+const DAY_NAMES = ['NED','PON','UTO','SRE','ČET','PET','SUB'];
+const MONTH_NAMES = ['jan','feb','mar','apr','maj','jun','jul','avg','sep','okt','nov','dec'];
+const HOURS_SHOWN = [0,3,6,9,12,15,18,21];
+
+let currentWeekStart = getMonday(new Date());
+
+function getMonday(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0,0,0,0);
+  return date;
+}
+
+function dateKey(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function loadMeals() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveMeals(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function addMeal(dateStr, time, note) {
+  const data = loadMeals();
+  if (!data[dateStr]) data[dateStr] = [];
+  data[dateStr].push({ time, note: note || '' });
+  data[dateStr].sort((a,b) => a.time.localeCompare(b.time));
+  saveMeals(data);
+}
+
+function removeMeal(dateStr, time) {
+  const data = loadMeals();
+  if (!data[dateStr]) return;
+  const idx = data[dateStr].findIndex(m => m.time === time);
+  if (idx !== -1) data[dateStr].splice(idx, 1);
+  if (data[dateStr].length === 0) delete data[dateStr];
+  saveMeals(data);
+}
+
+function timeToMinutes(t) {
+  const [h,m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToPercent(m) {
+  return (m / 1440) * 100;
+}
+
+function formatDuration(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function isToday(d) {
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() &&
+         d.getMonth() === now.getMonth() &&
+         d.getDate() === now.getDate();
+}
+
+function renderWeek() {
+  const container = document.getElementById('weekContainer');
+  container.innerHTML = '';
+  const data = loadMeals();
+  const now = new Date();
+
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(currentWeekStart);
+    day.setDate(day.getDate() + i);
+    const key = dateKey(day);
+    const meals = data[key] || [];
+    const today = isToday(day);
+
+    const col = document.createElement('div');
+    col.className = 'day-column' + (today ? ' is-today' : '');
+
+    const dayIndex = day.getDay();
+    col.innerHTML = `
+      <div class="day-header">
+        <div class="day-name">${DAY_NAMES[dayIndex]}</div>
+        <div class="day-date">${day.getDate()} ${MONTH_NAMES[day.getMonth()]}</div>
+      </div>
+      <div class="timeline" data-date="${key}"></div>
+      <div class="day-stats" id="stats-${key}"></div>
+    `;
+
+    container.appendChild(col);
+
+    const timeline = col.querySelector('.timeline');
+
+    for (const h of HOURS_SHOWN) {
+      const pct = minutesToPercent(h * 60);
+      const tick = document.createElement('div');
+      tick.className = 'hour-tick';
+      tick.style.top = pct + '%';
+      timeline.appendChild(tick);
+
+      if (h % 6 === 0) {
+        const lbl = document.createElement('div');
+        lbl.className = 'hour-label';
+        lbl.style.top = pct + '%';
+        lbl.textContent = String(h).padStart(2,'0') + ':00';
+        timeline.appendChild(lbl);
+      }
+    }
+
+    if (meals.length > 0) {
+      const firstMin = timeToMinutes(meals[0].time);
+      const lastMin = timeToMinutes(meals[meals.length - 1].time);
+
+      if (meals.length >= 2) {
+        const zone = document.createElement('div');
+        zone.className = 'eating-zone';
+        zone.style.top = minutesToPercent(firstMin) + '%';
+        zone.style.height = minutesToPercent(lastMin - firstMin) + '%';
+        timeline.appendChild(zone);
+      }
+
+      const prevDay = new Date(day);
+      prevDay.setDate(prevDay.getDate() - 1);
+      const prevKey = dateKey(prevDay);
+      const prevMeals = data[prevKey];
+      if (prevMeals && prevMeals.length > 0) {
+        const prevLastMin = timeToMinutes(prevMeals[prevMeals.length - 1].time);
+        const overnightMin = (1440 - prevLastMin) + firstMin;
+        const badge = document.createElement('div');
+        badge.className = 'overnight-fast';
+        badge.style.top = '0';
+        badge.style.height = minutesToPercent(firstMin) + '%';
+        badge.innerHTML = `
+          <span class="overnight-fast-label">post</span>
+          <span class="overnight-fast-value">${formatDuration(overnightMin)}</span>
+          <span class="overnight-fast-arrow">&#9660;</span>
+        `;
+        timeline.appendChild(badge);
+      }
+
+      for (const meal of meals) {
+        const min = timeToMinutes(meal.time);
+        const marker = document.createElement('div');
+        marker.className = 'meal-marker';
+        marker.style.top = minutesToPercent(min) + '%';
+        marker.innerHTML = `
+          <span class="meal-dot"></span>
+          <span class="meal-time-label">${meal.time}</span>
+          ${meal.note ? `<span class="meal-note-label">${escapeHtml(meal.note)}</span>` : ''}
+          <button class="meal-delete" data-date="${key}" data-time="${meal.time}" title="Obriši">&times;</button>
+        `;
+        timeline.appendChild(marker);
+      }
+
+      const eatingMin = lastMin - firstMin;
+      const fastingMin = 1440 - eatingMin;
+      const statsEl = col.querySelector('.day-stats');
+      statsEl.innerHTML = `
+        <div class="stat-eating">${formatDuration(eatingMin)} jedenje</div>
+        <div class="stat-fasting">${formatDuration(fastingMin)} post</div>
+        <div class="stat-count">${meals.length} ${meals.length === 1 ? 'obrok' : meals.length < 5 ? 'obroka' : 'obroka'}</div>
+      `;
+    } else {
+      const statsEl = col.querySelector('.day-stats');
+      statsEl.innerHTML = `<div class="stat-fasting" style="opacity:.4">—</div>`;
+    }
+
+    if (today) {
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const nowLine = document.createElement('div');
+      nowLine.className = 'now-line';
+      nowLine.style.top = minutesToPercent(nowMin) + '%';
+      nowLine.innerHTML = '<div class="now-dot"></div>';
+      timeline.appendChild(nowLine);
+    }
+
+    timeline.addEventListener('click', (e) => {
+      if (e.target.closest('.meal-delete') || e.target.closest('.meal-marker')) return;
+      const rect = timeline.getBoundingClientRect();
+      const pct = (e.clientY - rect.top) / rect.height;
+      const totalMin = Math.round(pct * 1440);
+      const h = Math.floor(totalMin / 60);
+      const m = Math.round(totalMin % 60 / 5) * 5;
+      const timeStr = String(h).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0');
+      openModal(key, timeStr);
+    });
+  }
+
+  updateWeekLabel();
+  scrollToToday();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function updateWeekLabel() {
+  const end = new Date(currentWeekStart);
+  end.setDate(end.getDate() + 6);
+  const label = `${currentWeekStart.getDate()} ${MONTH_NAMES[currentWeekStart.getMonth()]} — ${end.getDate()} ${MONTH_NAMES[end.getMonth()]}`;
+  document.getElementById('weekLabel').textContent = label;
+}
+
+function scrollToToday() {
+  if (window.innerWidth > 640) return;
+  const container = document.getElementById('weekContainer');
+  const todayCol = container.querySelector('.is-today');
+  if (todayCol) {
+    todayCol.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+  }
+}
+
+// Navigation
+document.getElementById('prevWeek').addEventListener('click', () => {
+  currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+  renderWeek();
+});
+
+document.getElementById('nextWeek').addEventListener('click', () => {
+  currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+  renderWeek();
+});
+
+document.getElementById('todayBtn').addEventListener('click', () => {
+  currentWeekStart = getMonday(new Date());
+  renderWeek();
+});
+
+// Modal
+const overlay = document.getElementById('modalOverlay');
+const dateInput = document.getElementById('mealDate');
+const timeInput = document.getElementById('mealTime');
+const noteInput = document.getElementById('mealNote');
+
+function openModal(dateStr, timeStr) {
+  dateInput.value = dateStr || dateKey(new Date());
+  if (timeStr) {
+    timeInput.value = timeStr;
+  } else {
+    const now = new Date();
+    timeInput.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  }
+  noteInput.value = '';
+  overlay.classList.add('active');
+  setTimeout(() => timeInput.focus(), 100);
+}
+
+function closeModal() {
+  overlay.classList.remove('active');
+}
+
+document.getElementById('fabAdd').addEventListener('click', () => openModal());
+document.getElementById('modalCancel').addEventListener('click', closeModal);
+overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+document.getElementById('modalSave').addEventListener('click', () => {
+  const d = dateInput.value;
+  const t = timeInput.value;
+  if (!d || !t) return;
+  addMeal(d, t, noteInput.value.trim());
+  closeModal();
+  renderWeek();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Enter' && overlay.classList.contains('active')) {
+    document.getElementById('modalSave').click();
+  }
+});
+
+// Delete meals (event delegation)
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.meal-delete');
+  if (!btn) return;
+  e.stopPropagation();
+  const date = btn.dataset.date;
+  const time = btn.dataset.time;
+  removeMeal(date, time);
+  renderWeek();
+});
+
+// Mobile swipe indicator: highlight current day column
+function updateMobileIndicator() {
+  if (window.innerWidth > 640) return;
+  const container = document.getElementById('weekContainer');
+  const cols = container.querySelectorAll('.day-column');
+  const scrollLeft = container.scrollLeft;
+  const colWidth = cols[0]?.offsetWidth || 1;
+  const activeIdx = Math.round(scrollLeft / colWidth);
+  cols.forEach((c, i) => {
+    c.style.opacity = i === activeIdx ? '1' : '.4';
+  });
+}
+
+document.getElementById('weekContainer').addEventListener('scroll', updateMobileIndicator);
+window.addEventListener('resize', () => { renderWeek(); });
+
+// Update now-line every minute
+setInterval(() => {
+  const nowLines = document.querySelectorAll('.now-line');
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  nowLines.forEach(l => { l.style.top = minutesToPercent(nowMin) + '%'; });
+}, 60000);
+
+// Init
+renderWeek();
+
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
+
+</body>
+</html>
