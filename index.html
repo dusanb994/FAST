@@ -215,6 +215,70 @@ header{
 .stat-fasting{font-size:.6rem;color:var(--text2);margin-top:1px}
 .stat-count{font-size:.55rem;color:var(--text2);margin-top:1px}
 
+/* ── Settings button ────────────────────────── */
+.settings-btn{
+  background:var(--surface);border:1px solid var(--border);color:var(--text2);
+  width:36px;height:36px;border-radius:8px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;transition:all .15s;position:relative;
+}
+.settings-btn:hover{background:var(--surface2);border-color:var(--accent);color:var(--text)}
+.sync-dot{
+  position:absolute;top:-2px;right:-2px;
+  width:8px;height:8px;border-radius:50%;
+  border:2px solid var(--bg);
+}
+.sync-dot.connected{background:#22c55e}
+.sync-dot.disconnected{background:var(--text2)}
+.sync-dot.syncing{background:var(--accent);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Settings Panel ─────────────────────────── */
+.settings-overlay{
+  position:fixed;inset:0;z-index:50;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.settings-overlay.active{opacity:1;pointer-events:auto}
+.settings-panel{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:16px;padding:28px 24px 24px;
+  width:min(400px,92vw);
+  transform:translateY(20px);transition:transform .25s;
+}
+.settings-overlay.active .settings-panel{transform:translateY(0)}
+.settings-panel h2{font-size:1.1rem;font-weight:600;margin-bottom:6px}
+.settings-desc{font-size:.75rem;color:var(--text2);margin-bottom:18px;line-height:1.5}
+.settings-status{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 12px;border-radius:8px;
+  background:var(--surface2);margin-bottom:16px;
+  font-size:.8rem;
+}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.status-dot.on{background:#22c55e}
+.status-dot.off{background:var(--text2)}
+.token-input-wrap{position:relative}
+.token-toggle{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--text2);cursor:pointer;
+  font-size:.8rem;font-family:var(--font);
+}
+.settings-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.settings-actions .btn{flex:1;min-width:0;text-align:center;font-size:.8rem;padding:9px 10px}
+.btn-danger{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+.btn-danger:hover{background:rgba(239,68,68,.25)}
+.btn-sync{background:rgba(129,140,248,.15);color:#818cf8;border:1px solid rgba(129,140,248,.3)}
+.btn-sync:hover{background:rgba(129,140,248,.25)}
+.sync-msg{
+  font-size:.7rem;color:var(--text2);text-align:center;
+  margin-top:10px;min-height:1em;
+  transition:color .2s;
+}
+.sync-msg.ok{color:#22c55e}
+.sync-msg.err{color:#ef4444}
+
 /* ── FAB ────────────────────────────────────── */
 .fab{
   position:fixed;bottom:24px;right:24px;z-index:20;
@@ -319,7 +383,13 @@ header{
     <span class="logo-icon">&#127860;</span>
     <span>Meal Tracker</span>
   </div>
-  <button class="today-btn" id="todayBtn">Danas</button>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="today-btn" id="todayBtn">Danas</button>
+    <button class="settings-btn" id="settingsBtn" aria-label="Podešavanja">
+      &#9881;
+      <span class="sync-dot disconnected" id="syncDot"></span>
+    </button>
+  </div>
   <nav class="week-nav">
     <button id="prevWeek" aria-label="Previous week">&#8249;</button>
     <span class="week-label" id="weekLabel"></span>
@@ -330,6 +400,37 @@ header{
 <div class="week-container" id="weekContainer"></div>
 
 <button class="fab" id="fabAdd" aria-label="Dodaj obrok">+</button>
+
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <h2>Cloud Sync</h2>
+    <p class="settings-desc">Povezi sa GitHub Gist-om da sacuvas podatke u oblaku. Radi na svim uredjajima.</p>
+    <div class="settings-status">
+      <span class="status-dot off" id="statusDot"></span>
+      <span id="statusText">Nije povezano</span>
+    </div>
+    <div class="form-group">
+      <label for="ghToken">GitHub Personal Access Token</label>
+      <div class="token-input-wrap">
+        <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxx">
+        <button class="token-toggle" id="tokenToggle">prikazi</button>
+      </div>
+    </div>
+    <div class="form-group" id="gistIdGroup" style="display:none">
+      <label for="ghGistId">Gist ID (opciono, za postojeci Gist)</label>
+      <input type="text" id="ghGistId" placeholder="automatski se kreira">
+    </div>
+    <div class="settings-actions">
+      <button class="btn btn-primary" id="btnConnect">Povezi</button>
+      <button class="btn btn-sync" id="btnSyncNow" style="display:none">Sync sada</button>
+      <button class="btn btn-danger" id="btnDisconnect" style="display:none">Prekini</button>
+    </div>
+    <div class="sync-msg" id="syncMsg"></div>
+    <div class="form-actions" style="margin-top:14px">
+      <button class="btn btn-secondary" id="settingsClose">Zatvori</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
@@ -392,6 +493,7 @@ function addMeal(dateStr, time, note) {
   data[dateStr].push({ time, note: note || '' });
   data[dateStr].sort((a,b) => a.time.localeCompare(b.time));
   saveMeals(data);
+  syncAfterChange();
 }
 
 function removeMeal(dateStr, time) {
@@ -401,6 +503,7 @@ function removeMeal(dateStr, time) {
   if (idx !== -1) data[dateStr].splice(idx, 1);
   if (data[dateStr].length === 0) delete data[dateStr];
   saveMeals(data);
+  syncAfterChange();
 }
 
 function timeToMinutes(t) {
@@ -671,8 +774,196 @@ setInterval(() => {
   nowLines.forEach(l => { l.style.top = minutesToPercent(nowMin) + '%'; });
 }, 60000);
 
+// ── Gist Sync ─────────────────────────────────
+const GIST_TOKEN_KEY = 'mealTracker_ghToken';
+const GIST_ID_KEY = 'mealTracker_gistId';
+const GIST_FILE = 'meal-tracker-data.json';
+
+function getGistConfig() {
+  return {
+    token: localStorage.getItem(GIST_TOKEN_KEY) || '',
+    gistId: localStorage.getItem(GIST_ID_KEY) || ''
+  };
+}
+
+function isGistConnected() {
+  const c = getGistConfig();
+  return !!(c.token && c.gistId);
+}
+
+async function createGist(token) {
+  const res = await fetch('https://api.github.com/gists', {
+    method: 'POST',
+    headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      description: 'Meal Tracker data',
+      public: false,
+      files: { [GIST_FILE]: { content: JSON.stringify(loadMeals()) } }
+    })
+  });
+  if (!res.ok) throw new Error(`GitHub API: ${res.status}`);
+  const data = await res.json();
+  return data.id;
+}
+
+async function updateGist(token, gistId, meals) {
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      files: { [GIST_FILE]: { content: JSON.stringify(meals) } }
+    })
+  });
+  if (!res.ok) throw new Error(`GitHub API: ${res.status}`);
+}
+
+async function loadGist(token, gistId) {
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+    headers: { 'Authorization': `token ${token}` }
+  });
+  if (!res.ok) throw new Error(`GitHub API: ${res.status}`);
+  const data = await res.json();
+  const file = data.files[GIST_FILE];
+  if (!file) return {};
+  try { return JSON.parse(file.content); } catch { return {}; }
+}
+
+function mergeData(local, remote) {
+  const merged = {};
+  const allDates = new Set([...Object.keys(local), ...Object.keys(remote)]);
+  for (const date of allDates) {
+    const lMeals = local[date] || [];
+    const rMeals = remote[date] || [];
+    const seen = new Set();
+    const combined = [];
+    for (const m of [...lMeals, ...rMeals]) {
+      const key = m.time + '|' + (m.note || '');
+      if (!seen.has(key)) { seen.add(key); combined.push(m); }
+    }
+    combined.sort((a, b) => a.time.localeCompare(b.time));
+    if (combined.length > 0) merged[date] = combined;
+  }
+  return merged;
+}
+
+let syncInProgress = false;
+
+async function syncWithGist(showUI = false) {
+  if (syncInProgress) return;
+  if (!isGistConnected()) return;
+  syncInProgress = true;
+  updateSyncDot('syncing');
+  try {
+    const { token, gistId } = getGistConfig();
+    const remote = await loadGist(token, gistId);
+    const local = loadMeals();
+    const merged = mergeData(local, remote);
+    saveMeals(merged);
+    await updateGist(token, gistId, merged);
+    renderWeek();
+    updateSyncDot('connected');
+    if (showUI) showSyncMsg('Sinhronizovano!', 'ok');
+  } catch (err) {
+    updateSyncDot('connected');
+    if (showUI) showSyncMsg('Greska: ' + err.message, 'err');
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+function syncAfterChange() {
+  if (!isGistConnected()) return;
+  clearTimeout(syncAfterChange._t);
+  syncAfterChange._t = setTimeout(() => syncWithGist(), 1500);
+}
+
+function updateSyncDot(state) {
+  const dot = document.getElementById('syncDot');
+  dot.className = 'sync-dot ' + state;
+}
+
+function showSyncMsg(msg, cls) {
+  const el = document.getElementById('syncMsg');
+  el.textContent = msg;
+  el.className = 'sync-msg ' + (cls || '');
+  clearTimeout(showSyncMsg._t);
+  showSyncMsg._t = setTimeout(() => { el.textContent = ''; el.className = 'sync-msg'; }, 4000);
+}
+
+function updateSettingsUI() {
+  const connected = isGistConnected();
+  const { token, gistId } = getGistConfig();
+  document.getElementById('statusDot').className = 'status-dot ' + (connected ? 'on' : 'off');
+  document.getElementById('statusText').textContent = connected ? `Povezano (Gist: ${gistId.slice(0,8)}...)` : 'Nije povezano';
+  document.getElementById('ghToken').value = token;
+  document.getElementById('ghGistId').value = gistId;
+  document.getElementById('btnConnect').style.display = connected ? 'none' : '';
+  document.getElementById('btnSyncNow').style.display = connected ? '' : 'none';
+  document.getElementById('btnDisconnect').style.display = connected ? '' : 'none';
+  document.getElementById('gistIdGroup').style.display = connected ? 'none' : '';
+  updateSyncDot(connected ? 'connected' : 'disconnected');
+}
+
+// Settings panel events
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  updateSettingsUI();
+  document.getElementById('settingsOverlay').classList.add('active');
+});
+
+document.getElementById('settingsClose').addEventListener('click', () => {
+  document.getElementById('settingsOverlay').classList.remove('active');
+});
+
+document.getElementById('settingsOverlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('settingsOverlay'))
+    document.getElementById('settingsOverlay').classList.remove('active');
+});
+
+document.getElementById('tokenToggle').addEventListener('click', () => {
+  const inp = document.getElementById('ghToken');
+  const btn = document.getElementById('tokenToggle');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'sakrij'; }
+  else { inp.type = 'password'; btn.textContent = 'prikazi'; }
+});
+
+document.getElementById('btnConnect').addEventListener('click', async () => {
+  const token = document.getElementById('ghToken').value.trim();
+  if (!token) { showSyncMsg('Unesi token', 'err'); return; }
+  const existingId = document.getElementById('ghGistId').value.trim();
+  showSyncMsg('Povezivanje...', '');
+  try {
+    let gistId;
+    if (existingId) {
+      const res = await fetch(`https://api.github.com/gists/${existingId}`, {
+        headers: { 'Authorization': `token ${token}` }
+      });
+      if (!res.ok) throw new Error('Gist nije pronadjen');
+      gistId = existingId;
+    } else {
+      gistId = await createGist(token);
+    }
+    localStorage.setItem(GIST_TOKEN_KEY, token);
+    localStorage.setItem(GIST_ID_KEY, gistId);
+    updateSettingsUI();
+    await syncWithGist(true);
+  } catch (err) {
+    showSyncMsg('Greska: ' + err.message, 'err');
+  }
+});
+
+document.getElementById('btnSyncNow').addEventListener('click', () => syncWithGist(true));
+
+document.getElementById('btnDisconnect').addEventListener('click', () => {
+  localStorage.removeItem(GIST_TOKEN_KEY);
+  localStorage.removeItem(GIST_ID_KEY);
+  updateSettingsUI();
+  showSyncMsg('Veza prekinuta', '');
+});
+
 // Init
 renderWeek();
+updateSyncDot(isGistConnected() ? 'connected' : 'disconnected');
+if (isGistConnected()) syncWithGist();
 
 // PWA Service Worker
 if ('serviceWorker' in navigator) {
