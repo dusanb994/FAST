@@ -387,7 +387,7 @@ header{
 <header>
   <div class="logo">
     <span class="logo-icon">&#127860;</span>
-    <span>Meal Tracker <small style="font-size:.6em;color:var(--text2)">(v11)</small></span>
+    <span>Meal Tracker <small id="versionBtn" style="font-size:.6em;color:var(--text2);cursor:pointer;text-decoration:underline;text-underline-offset:2px">(v12)</small></span>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <button class="today-btn" id="todayBtn">Danas</button>
@@ -1004,6 +1004,19 @@ document.getElementById('btnDisconnect').addEventListener('click', () => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js');
 }
+
+document.getElementById('versionBtn').addEventListener('click', async () => {
+  if (!confirm('Obrisati cache i ponovo učitati?')) return;
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  }
+  if (navigator.serviceWorker) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+  }
+  location.reload(true);
+});
 </script>
 
 </body>
