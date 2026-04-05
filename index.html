@@ -744,7 +744,19 @@ function getMobileColWidth() {
 }
 
 function setMobileOffset(idx) {
-  mobileOffset = Math.max(0, Math.min(idx, 4));
+  if (idx > 4) {
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    mobileOffset = 0;
+    renderWeek();
+    return;
+  }
+  if (idx < 0) {
+    currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+    mobileOffset = 4;
+    renderWeek();
+    return;
+  }
+  mobileOffset = idx;
   applyMobileTransform();
 }
 
