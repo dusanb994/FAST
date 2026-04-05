@@ -387,7 +387,7 @@ header{
 <header>
   <div class="logo">
     <span class="logo-icon">&#127860;</span>
-    <span>Meal Tracker <small id="versionBtn" style="font-size:.6em;color:var(--text2);cursor:pointer;text-decoration:underline;text-underline-offset:2px">(v12)</small></span>
+    <span>Meal Tracker <small id="versionBtn" style="font-size:.6em;color:var(--text2);cursor:pointer;text-decoration:underline;text-underline-offset:2px">(v13)</small></span>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <button class="today-btn" id="todayBtn">Danas</button>
@@ -1002,7 +1002,14 @@ document.getElementById('btnDisconnect').addEventListener('click', () => {
 
 // PWA Service Worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js');
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'activated') location.reload();
+      });
+    });
+  });
 }
 
 document.getElementById('versionBtn').addEventListener('click', async () => {
